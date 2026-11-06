@@ -186,6 +186,51 @@ document.querySelector('#start-surprise').addEventListener('click', () => {
   burstAt(document.querySelector('.dedication'));
 });
 
+// The album uses the same optional chimes as the rest of the page.
+const photoDialog = document.querySelector('#photo-dialog');
+const photoCards = [...document.querySelectorAll('.photo-card')];
+let currentPhoto = 0;
+function showPhoto(index) {
+  currentPhoto = (index + photoCards.length) % photoCards.length;
+  const card = photoCards[currentPhoto];
+  const source = card.querySelector('img');
+  const fullPhoto = document.querySelector('#full-photo');
+  fullPhoto.src = source.getAttribute('src');
+  fullPhoto.alt = source.alt;
+  document.querySelector('#full-photo-caption').textContent = card.querySelector('.photo-caption').textContent;
+  document.querySelector('#photo-count').textContent = `${currentPhoto + 1} / ${photoCards.length}`;
+  animateElement(fullPhoto, 'message-in');
+}
+photoCards.forEach((card, index) => card.addEventListener('click', () => {
+  showPhoto(index);
+  photoDialog.showModal();
+  document.body.classList.add('modal-open');
+  playEffect('open');
+}));
+document.querySelector('.photo-close').addEventListener('click', () => photoDialog.close());
+photoDialog.addEventListener('close', () => document.body.classList.remove('modal-open'));
+function changePhoto(step) { showPhoto(currentPhoto + step); playEffect('sparkle'); }
+document.querySelector('#previous-photo').addEventListener('click', () => changePhoto(-1));
+document.querySelector('#next-photo').addEventListener('click', () => changePhoto(1));
+photoDialog.addEventListener('keydown', event => {
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    changePhoto(event.key === 'ArrowLeft' ? -1 : 1);
+  }
+});
+let photoTouchStart = null;
+photoDialog.addEventListener('touchstart', event => {
+  photoTouchStart = event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null;
+}, { passive: true });
+photoDialog.addEventListener('touchend', event => {
+  if (!photoTouchStart || event.touches.length || !event.changedTouches.length) { photoTouchStart = null; return; }
+  const dx = event.changedTouches[0].clientX - photoTouchStart.x;
+  const dy = event.changedTouches[0].clientY - photoTouchStart.y;
+  if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) changePhoto(dx < 0 ? 1 : -1);
+  photoTouchStart = null;
+}, { passive: true });
+photoDialog.addEventListener('touchcancel', () => { photoTouchStart = null; }, { passive: true });
+
 if ('IntersectionObserver' in window && !reducedMotion.matches) {
   const observer = new IntersectionObserver(entries => {
     entries.forEach(entry => {

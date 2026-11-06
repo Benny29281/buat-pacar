@@ -23,6 +23,8 @@ Halaman pembuka **Buka kejutanmu** memulai musik setelah disentuh agar sesuai at
 
 ## Personalisasi
 
+Galeri tiga foto memakai `assets/photos/foto-1.jpg`, `foto-2.jpg`, dan `foto-3.jpg`. Sertakan folder `assets` saat upload ke GitHub. Di HP, geser galeri atau sentuh foto untuk membuka tampilan penuh; gunakan tombol panah atau usap untuk berpindah foto.
+
 - Ubah isi surat dan nama penutup di `index.html` pada bagian `letter-content`.
 - Ubah pesan kecil melalui daftar `messages` di `script.js`.
 - Ubah warna melalui variabel di bagian atas `style.css`.
