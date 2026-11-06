@@ -7,9 +7,13 @@
   <meta name="description" content="Sebuah sudut kecil di internet, khusus untuk Rizky Ashria. Dibuat dengan sepenuh hati.">
   <title>Untuk Rizky Ashria — dengan sepenuh hati</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="mobile.css">
   <script src="script.js" defer></script>
 </head>
 <body>
+  <dialog id="welcome-dialog" aria-labelledby="welcome-title">
+    <div class="welcome-content"><span class="welcome-heart" aria-hidden="true">♡</span><p class="eyebrow">SESUATU YANG KECIL, DARI HATI</p><h2 id="welcome-title">Hai, Rizky.<br><em>Ini untuk kamu.</em></h2><p>Ada sedikit kejutan dan banyak rasa sayang<br>yang menunggu kamu di sini.</p><button class="primary-button" id="start-surprise">Buka kejutanmu <span aria-hidden="true">♡</span></button><p class="welcome-note">♫ dengan musik lembut · bisa dimatikan kapan saja</p></div>
+  </dialog>
   <div class="petals" aria-hidden="true"></div>
   <header class="site-header"><a class="wordmark" href="#">a little love letter <span>♡</span></a><span class="header-note">DIBUAT KHUSUS UNTUKMU</span><button class="sound-toggle" aria-label="Nyalakan musik lembut" aria-pressed="false"><span aria-hidden="true">♫</span> <span class="sound-label">Musik off</span></button></header>
   <main>

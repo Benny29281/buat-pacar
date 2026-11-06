@@ -1,14 +1,28 @@
 'use strict';
 
 const letter = document.querySelector('#letter-dialog');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+let openingLetter = false;
 document.querySelectorAll('.open-letter').forEach(button => button.addEventListener('click', () => {
-  letter.showModal();
-  document.body.classList.add('modal-open');
+  if (openingLetter || letter.open) return;
+  openingLetter = true;
+  document.querySelector('.envelope').classList.add('is-opening');
+  playEffect('open');
+  burstAt(button);
+  window.setTimeout(() => {
+    letter.showModal();
+    letter.scrollTop = 0;
+    document.body.classList.add('modal-open');
+    openingLetter = false;
+  }, reducedMotion.matches ? 0 : 650);
 }));
-function closeLetter() { letter.close(); }
+function closeLetter() { playEffect('tap'); letter.close(); }
 document.querySelector('.close-dialog').addEventListener('click', closeLetter);
 document.querySelector('.close-letter').addEventListener('click', closeLetter);
-letter.addEventListener('close', () => document.body.classList.remove('modal-open'));
+letter.addEventListener('close', () => {
+  document.body.classList.remove('modal-open');
+  document.querySelector('.envelope').classList.remove('is-opening');
+});
 letter.addEventListener('click', event => {
   if (event.target !== letter) return;
   const rect = letter.getBoundingClientRect();
@@ -22,6 +36,8 @@ document.querySelectorAll('.reason').forEach(card => {
     card.querySelector('.reason-teaser').hidden = expanded;
     card.querySelector('.reason-reveal').hidden = !expanded;
     card.querySelector('.reason-action').innerHTML = expanded ? 'simpan di hati <span>♡</span>' : 'buka pesan <span>↗</span>';
+    playEffect(expanded ? 'sparkle' : 'tap');
+    if (expanded) { animateElement(card.querySelector('.reason-reveal'), 'message-in'); burstAt(card); }
   });
 });
 
@@ -40,12 +56,16 @@ document.querySelector('#next-message').addEventListener('click', () => {
   messageIndex = (messageIndex + 1) % messages.length;
   document.querySelector('#pocket-message').textContent = messages[messageIndex];
   document.querySelector('#message-counter').textContent = `${String(messageIndex + 1).padStart(2, '0')} / 08`;
+  animateElement(document.querySelector('#pocket-message'), 'message-in');
+  playEffect('sparkle');
 });
 
 let hugs = 0;
 const loveButton = document.querySelector('#send-love');
 loveButton.addEventListener('click', () => {
   hugs++;
+  playEffect('love');
+  animateElement(loveButton, 'heart-pop');
   loveButton.textContent = '♥';
   document.querySelector('#hug-caption').textContent = hugs === 1 ? 'Satu peluk hangat untuk Rizky. Kamu disayang! ♡' : `${hugs} peluk untukmu. Sayangnya masih banyak lagi. ♡`;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -63,27 +83,37 @@ loveButton.addEventListener('click', () => {
 
 // A quiet, original music-box melody; generated locally, without audio downloads.
 let audioContext;
+let audioStarting = false;
 let musicTimer;
 let musicOn = false;
 let activeNotes = new Set();
 const melody = [523.25,659.25,783.99,659.25,587.33,698.46,880,698.46,659.25,783.99,1046.5,987.77,880,783.99,659.25,587.33];
 const soundButton = document.querySelector('.sound-toggle');
+function createTone(frequency, delay = 0, duration = .6, volume = .04) {
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  const start = audioContext.currentTime + delay;
+  oscillator.type = 'sine';
+  oscillator.frequency.value = frequency;
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(volume, start + .02);
+  gain.gain.exponentialRampToValueAtTime(.001, start + duration);
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  activeNotes.add(oscillator);
+  oscillator.onended = () => { activeNotes.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+  oscillator.start(start);
+  oscillator.stop(start + duration + .05);
+}
+function playEffect(kind) {
+  if (!musicOn || !audioContext || audioContext.state !== 'running') return;
+  const notes = { tap: [659.25], sparkle: [783.99, 1046.5], open: [523.25, 659.25, 783.99, 1046.5], love: [659.25, 783.99, 987.77] };
+  (notes[kind] || notes.tap).forEach((note, index) => createTone(note, index * .09, .55, .045));
+}
 function playMelody() {
   melody.forEach((frequency, index) => {
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    const start = audioContext.currentTime + index * .6;
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(0, start);
-    gain.gain.linearRampToValueAtTime(.055, start + .02);
-    gain.gain.exponentialRampToValueAtTime(.001, start + 1.6);
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-    activeNotes.add(oscillator);
-    oscillator.onended = () => { activeNotes.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
-    oscillator.start(start);
-    oscillator.stop(start + 1.7);
+    createTone(frequency, index * .6, 1.6, .03);
+    if (index % 4 === 0) createTone(frequency / 2, index * .6, 2.3, .022);
   });
 }
 function stopMusic() {
@@ -92,25 +122,80 @@ function stopMusic() {
   activeNotes.clear();
   musicOn = false;
   soundButton.setAttribute('aria-pressed', 'false');
-  soundButton.setAttribute('aria-label', 'Nyalakan musik lembut');
-  document.querySelector('.sound-label').textContent = 'Musik off';
+  soundButton.setAttribute('aria-label', 'Nyalakan musik dan efek suara');
+  document.querySelector('.sound-label').textContent = 'Suara off';
 }
-soundButton.addEventListener('click', async () => {
-  if (musicOn) { stopMusic(); return; }
+async function startMusic() {
+  if (musicOn || audioStarting) return;
+  audioStarting = true;
   try {
     const AudioEngine = window.AudioContext || window.webkitAudioContext;
     if (!AudioEngine) throw new Error('Audio unavailable');
     audioContext ??= new AudioEngine();
     await audioContext.resume();
+    if (document.hidden) { stopMusic(); return; }
     musicOn = true;
     playMelody();
     musicTimer = setInterval(playMelody, 10400);
     soundButton.setAttribute('aria-pressed', 'true');
-    soundButton.setAttribute('aria-label', 'Matikan musik lembut');
-    document.querySelector('.sound-label').textContent = 'Musik on';
+    soundButton.setAttribute('aria-label', 'Matikan musik dan efek suara');
+    document.querySelector('.sound-label').textContent = 'Suara on';
   } catch {
     stopMusic();
     document.querySelector('.sound-label').textContent = 'Musik tidak tersedia';
-  }
+  } finally { audioStarting = false; }
+}
+soundButton.addEventListener('click', () => {
+  if (musicOn) stopMusic(); else startMusic();
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden && musicOn) stopMusic(); });
+window.addEventListener('pagehide', stopMusic);
+
+function animateElement(element, name) {
+  if (reducedMotion.matches || !element.animate) return;
+  const frames = name === 'heart-pop'
+    ? [{ transform: 'scale(1)' }, { transform: 'scale(1.25)', offset: .4 }, { transform: 'scale(1)' }]
+    : [{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'translateY(0)' }];
+  element.animate(frames, { duration: 450, easing: 'ease-out' });
+}
+function burstAt(element) {
+  if (reducedMotion.matches) return;
+  const container = document.querySelector('#celebration');
+  if (container.childElementCount > 45) return;
+  const rect = element.getBoundingClientRect();
+  for (let i = 0; i < 8; i++) {
+    const particle = document.createElement('span');
+    particle.className = 'tap-particle';
+    particle.textContent = i % 2 ? '♡' : '✧';
+    const angle = Math.PI * 2 * i / 8;
+    particle.style.cssText = `left:${rect.left + rect.width / 2}px;top:${rect.top + rect.height / 2}px;--x:${Math.cos(angle) * 90}px;--y:${Math.sin(angle) * 75 - 30}px;`;
+    container.append(particle);
+    particle.addEventListener('animationend', () => particle.remove(), { once: true });
+  }
+}
+
+// The welcome button is the user gesture that unlocks audio on mobile browsers.
+const welcome = document.querySelector('#welcome-dialog');
+welcome.showModal();
+document.body.classList.add('modal-open');
+welcome.addEventListener('close', () => document.body.classList.remove('modal-open'));
+document.querySelector('#start-surprise').addEventListener('click', () => {
+  startMusic();
+  welcome.close();
+  document.body.classList.add('experience-started');
+  burstAt(document.querySelector('.dedication'));
+});
+
+if ('IntersectionObserver' in window && !reducedMotion.matches) {
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('is-visible');
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: .1 });
+  document.querySelectorAll('.section').forEach(section => { section.classList.add('scroll-reveal'); observer.observe(section); });
+  reducedMotion.addEventListener('change', event => {
+    if (event.matches) { observer.disconnect(); document.querySelectorAll('.scroll-reveal').forEach(section => section.classList.add('is-visible')); }
+  });
+}
